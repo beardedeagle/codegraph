@@ -12,6 +12,9 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixes
+
+- Rust inline `#[test]` functions now appear in test coverage for directly and indirectly called code in `codegraph_explore` after re-indexing.
 
 ## [1.6.0] - 2026-08-26
 

@@ -96,6 +96,19 @@ export const rustExtractor: LanguageExtractor = {
   paramsField: 'parameters',
   returnField: 'return_type',
   getReturnType: extractRustReturnType,
+  extractModifiers: (node) => {
+    if (node.type !== 'function_item') return undefined;
+    // Outer attributes are siblings; stop at the preceding item so a test
+    // marker never leaks onto a neighboring helper or production function.
+    for (let sibling = node.previousNamedSibling; sibling; sibling = sibling.previousNamedSibling) {
+      if (sibling.type === 'line_comment' || sibling.type === 'block_comment') continue;
+      if (sibling.type !== 'attribute_item') break;
+      if (sibling.namedChildren.some((child) => child.type === 'attribute' && child.text.trim() === 'test')) {
+        return ['test'];
+      }
+    }
+    return undefined;
+  },
   getSignature: (node, source) => {
     const params = getChildByField(node, 'parameters');
     const returnType = getChildByField(node, 'return_type');

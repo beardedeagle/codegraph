@@ -328,6 +328,12 @@ export function isTestFile(filePath: string): boolean {
   return matchesNonProductionDir(lower);
 }
 
+/** Include inline Rust tests without classifying their whole source file as tests. */
+export function isTestNode(node: Node): boolean {
+  return isTestFile(node.filePath.replace(/\\/g, '/')) ||
+    (node.language === 'rust' && node.decorators?.includes('test') === true);
+}
+
 /**
  * Check if a path is in a non-production directory (integration, sample, example, etc.)
  * Handles both absolute paths (/foo/integration/bar) and relative paths (integration/bar).

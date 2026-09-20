@@ -283,6 +283,28 @@ impl<'t> Walker<'t> {
         let doc_ref = opt_str(&mut self.arena, extra.docstring.as_deref());
         let sig_ref = opt_str(&mut self.arena, extra.signature.as_deref());
         let ret_ref = opt_str(&mut self.arena, extra.return_type.as_deref());
+        // Match rustExtractor.extractModifiers: only an attached #[test]
+        // marks the function, never its neighbors or its containing module.
+        let mut decorators = NONE_STR;
+        if node.kind() == "function_item" {
+            let mut sibling = node.prev_named_sibling();
+            while let Some(attr) = sibling {
+                match attr.kind() {
+                    "line_comment" | "block_comment" => {}
+                    "attribute_item" => {
+                        let is_test = (0..attr.named_child_count())
+                            .filter_map(|i| attr.named_child(i))
+                            .any(|value| value.kind() == "attribute" && self.text(value).trim() == "test");
+                        if is_test {
+                            decorators = self.arena.put_list(&["test".to_string()]);
+                            break;
+                        }
+                    }
+                    _ => break,
+                }
+                sibling = attr.prev_named_sibling();
+            }
+        }
         let row = self.tables.push_node(&NodeRow {
             kind: node_kind_index(kind).unwrap(),
             visibility: extra.visibility.unwrap_or(0),
@@ -296,7 +318,7 @@ impl<'t> Walker<'t> {
             id: id_ref,
             docstring: doc_ref,
             signature: sig_ref,
-            decorators: NONE_STR,
+            decorators,
             type_parameters: NONE_STR,
             return_type: ret_ref,
             extra_json: NONE_STR,

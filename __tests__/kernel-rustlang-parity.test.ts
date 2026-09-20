@@ -104,6 +104,26 @@ describe.skipIf(!kernelBuilt)('kernel Rust extraction parity', () => {
     assertParity('fixtures/torture.rs (crlf)', crlf, 20);
   });
 
+  it('preserves inline test attributes without marking neighboring helpers', () => {
+    const source = `
+#[cfg(test)]
+mod tests {
+    #[/* built-in */ test /* marker */]
+    #[ignore]
+    // Still attached to the test.
+    fn parses() {}
+    fn helper() {}
+    #[cfg(test)]
+    fn cfg_only() {}
+}
+`;
+    assertParity('src/cli.rs', source);
+    const nodes = extractFromSource('src/cli.rs', source, 'rust').nodes;
+    expect(nodes.find((n) => n.name === 'parses')?.decorators).toEqual(['test']);
+    expect(nodes.find((n) => n.name === 'helper')?.decorators).toBeUndefined();
+    expect(nodes.find((n) => n.name === 'cfg_only')?.decorators).toBeUndefined();
+  });
+
   it('files with parse errors defer to the wasm extractor (recovery is encoding-dependent)', () => {
     const broken = 'fn f( {\n  return }} 12 (\n';
     process.env.CODEGRAPH_KERNEL_LANGS = 'all';
