@@ -16,7 +16,7 @@
  */
 
 import type { Edge, EdgeKind, Language, Node, NodeKind } from '../../types';
-import { isTestFile } from '../../search/query-utils';
+import { isTestNode } from '../../search/query-utils';
 
 // =============================================================================
 // Caps and thresholds
@@ -131,7 +131,7 @@ export function toNodeRef(node: Node): WireNodeRef {
     line: node.startLine,
     endLine: node.endLine,
     language: node.language,
-    test: isTestFile(file),
+    test: isTestNode(node),
   };
   if (node.signature) ref.signature = node.signature;
   if (node.isExported) ref.exported = true;

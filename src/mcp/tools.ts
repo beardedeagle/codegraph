@@ -31,7 +31,7 @@ import {
 } from '../sync/worktree';
 import type { PendingFile } from '../sync';
 import type { Node, Edge, SearchResult, Subgraph, NodeKind } from '../types';
-import { isTestFile, normalizeNameToken } from '../search/query-utils';
+import { isTestNode, normalizeNameToken } from '../search/query-utils';
 import { groupDefinitions, lastQualifierPart, matchesSymbol } from '../graph/symbol-lookup';
 import { extractQueryPaths, queryMightContainPaths } from '../search/query-paths';
 import {
@@ -3127,9 +3127,8 @@ export class ToolHandler {
       }
       if (uniq.length === 0) continue; // no blast radius → nothing to flag
 
-      const callerFiles = [...new Set(uniq.map((n) => rel(n.filePath)))];
-      const testFiles = callerFiles.filter((f) => isTestFile(f));
-      const nonTest = callerFiles.filter((f) => !isTestFile(f));
+      const testFiles = [...new Set(uniq.filter(isTestNode).map((n) => rel(n.filePath)))];
+      const nonTest = [...new Set(uniq.filter((n) => !isTestNode(n)).map((n) => rel(n.filePath)))];
 
       const shown = nonTest.slice(0, FILE_CAP).map((f) => `\`${f}\``).join(', ');
       const more = nonTest.length > FILE_CAP ? ` +${nonTest.length - FILE_CAP} more` : '';
@@ -3178,7 +3177,7 @@ export class ToolHandler {
           if (!n || visited.has(n.id)) continue;
           visited.add(n.id);
           const f = rel(n.filePath);
-          if (isTestFile(f)) found.add(f);
+          if (isTestNode(n)) found.add(f);
           else next.push(n);
         }
       }

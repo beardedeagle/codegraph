@@ -300,6 +300,12 @@ export function isTestFile(filePath: string): boolean {
   return isTestPath(filePath) || matchesNonProductionDir(filePath.toLowerCase());
 }
 
+/** Include inline Rust tests without classifying their whole source file as tests. */
+export function isTestNode(node: Node): boolean {
+  return isTestFile(node.filePath.replace(/\\/g, '/')) ||
+    (node.language === 'rust' && node.decorators?.includes('test') === true);
+}
+
 /**
  * Check if a file path names a TEST — a suite that exercises other code.
  *

@@ -13,6 +13,8 @@ import * as path from 'path';
 import * as os from 'os';
 import CodeGraph from '../src/index';
 import { ToolHandler } from '../src/mcp/tools';
+import { buildNode } from '../src/ui-server/api/node';
+import { toNodeRef } from '../src/ui-server/api/wire';
 
 describe('codegraph_explore — blast radius', () => {
   let testDir: string;
@@ -63,7 +65,24 @@ describe('codegraph_explore — blast radius', () => {
       `export function untestedCaller() { return untestedHelper(); }\n`,
     );
 
-    cg = CodeGraph.initSync(testDir, { config: { include: ['**/*.ts'], exclude: [] } });
+    fs.writeFileSync(path.join(src, 'cli.rs'), `
+pub fn parse_args_from() {}
+pub fn untested_rust() {}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn parse() { parse_args_from(); }
+    #[/* built-in */ test /* marker */]
+    #[ignore]
+    // Comments between attributes and the item do not detach them.
+    fn parse_exec() { parse(); }
+    fn test_named_helper() { untested_rust(); }
+    #[cfg(test)]
+    fn cfg_only_helper() { untested_rust(); }
+}
+`);
+
+    cg = CodeGraph.initSync(testDir, { config: { include: ['**/*.ts', '**/*.rs'], exclude: [] } });
     await cg.indexAll();
     handler = new ToolHandler(cg);
   });
@@ -111,5 +130,28 @@ describe('codegraph_explore — blast radius', () => {
     const text = res.content[0].text;
     // lonelyLeaf has zero callers — it must never appear under a blast-radius bullet.
     expect(text).not.toMatch(/Blast radius[\s\S]*`lonelyLeaf`/);
+  });
+
+  it.each([
+    ['parse', 1, 'tests:'],
+    ['parse_args_from', 2, 'tested via callers:'],
+  ])('finds inline Rust tests reaching %s in MCP and the viewer', async (name, hops, label) => {
+    const res = await handler.execute('codegraph_explore', { query: name });
+    const line = res.content[0].text.split('\n').find((l: string) => l.startsWith(`- \`${name}\``));
+    expect(line).toContain(`${label} \`src/cli.rs\``);
+    const node = cg.searchNodes(name).find((n) => n.node.name === name)!.node;
+    const view = await buildNode(cg, testDir, node.id) as { tests: unknown };
+    expect(view.tests).toMatchObject({ reached: true, hops, files: ['src/cli.rs'] });
+    const test = cg.searchNodes('parse_exec').find((n) => n.node.name === 'parse_exec')!.node;
+    expect(toNodeRef(test).test).toBe(true);
+    expect(toNodeRef(node).test).toBe(false);
+  });
+
+  it('does not treat every caller in a Rust file with inline tests as a test', async () => {
+    const res = await handler.execute('codegraph_explore', { query: 'untested_rust' });
+    expect(res.content[0].text).toMatch(/`untested_rust`[^\n]*no tests found within 3 caller hops/);
+    const node = cg.searchNodes('untested_rust').find((n) => n.node.name === 'untested_rust')!.node;
+    const view = await buildNode(cg, testDir, node.id) as { tests: unknown };
+    expect(view.tests).toMatchObject({ reached: false, files: [] });
   });
 });

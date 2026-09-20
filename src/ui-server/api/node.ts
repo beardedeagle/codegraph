@@ -22,7 +22,7 @@
 
 import type { CodeGraph } from '../../index';
 import type { Edge, Node, NodeKind } from '../../types';
-import { isTestFile } from '../../search/query-utils';
+import { isTestFile, isTestNode } from '../../search/query-utils';
 import { buildHierarchy, type WireOverride } from './hierarchy';
 import { notFound } from './respond';
 import { findIndexedFile, hasDriftedOnDisk } from './source';
@@ -325,7 +325,7 @@ export interface WireTestSummary {
  */
 function summarizeTestCallers(cg: CodeGraph, directCallers: readonly Node[]): WireTestSummary {
   const directFiles = [
-    ...new Set(directCallers.map((n) => toPosixPath(n.filePath)).filter(isTestFile)),
+    ...new Set(directCallers.filter(isTestNode).map((n) => toPosixPath(n.filePath))),
   ];
   if (directFiles.length > 0) {
     return {
@@ -360,7 +360,7 @@ function summarizeTestCallers(cg: CodeGraph, directCallers: readonly Node[]): Wi
         if (!source || visited.has(source.id)) continue;
         visited.add(source.id);
         const file = toPosixPath(source.filePath);
-        if (isTestFile(file)) found.add(file);
+        if (isTestNode(source)) found.add(file);
         else next.push(source);
       }
     }
